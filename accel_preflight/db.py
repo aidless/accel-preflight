@@ -1,0 +1,271 @@
+# -*- coding: utf-8 -*-
+"""能力数据库：规则 + 证据台账。
+
+每条规则的判定都挂在一条证据上（S0–S9），台账见 docs/sources.md。
+一手实测证据（kind=first-party）只允许给 ROCm 平台背书——我们没摸过
+DCU 硬件，所以凡是涉及 DCU 的状态一律来自上游公开文档，且查不到就写 unknown。
+"""
+
+# 平台集合。dcu 指海光 DCU/HCU 一类国产 GPGPU（其软件栈 DTK 以 ROCm/HIP 为底座）。
+PLATFORMS = ("nvidia", "rocm", "dcu")
+
+# 状态 → 严重度映射。unknown 永远不是 blocker。
+STATUS_SEVERITY = {
+    "ok": "info",
+    "variant": "warning",
+    "partial": "warning",
+    "unknown": "info",
+    "blocked": "blocker",
+}
+
+# ---------------------------------------------------------------------------
+# 证据台账（与 docs/sources.md 一一对应）
+# ---------------------------------------------------------------------------
+EVIDENCE = {
+    "S0": {
+        "kind": "meta",
+        "source": "n/a",
+        "note": "无来源：数据库没收录的包/参数一律 unknown，不猜测",
+    },
+    "S1": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/flashinfer-ai/flashinfer （README：仅 CUDA Support，12.9/13.0/13.4）",
+        "note": "FlashInfer 上游只发 CUDA 轮子，无 ROCm 分发",
+    },
+    "S2": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/Dao-AILab/flash-attention （README：『CUDA toolkit or ROCm toolkit』『### AMD ROCm Support』）",
+        "note": "FlashAttention 上游声明支持 ROCm 工具链",
+    },
+    "S3": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/rocm/flash-attention",
+        "note": "AMD 官方维护的 FlashAttention ROCm 移植仓库",
+    },
+    "S4": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/sgl-project/sglang （README 平台表：AMD Instinct MI300X/MI325X/MI350X/MI355X）",
+        "note": "SGLang 上游支持 AMD Instinct 平台",
+    },
+    "S5": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/triton-lang/triton （README：LLVM target 含 NVPTX;AMDGPU；AMD backend 调试一节）",
+        "note": "Triton 有 NVIDIA 与 AMD 双后端",
+    },
+    "S6": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/vllm-project/vllm （README：full CUDA/HIP graphs；NVIDIA/AMD GPUs 支持）",
+        "note": "vLLM 上游支持 AMD GPU（HIP 路径）",
+    },
+    "S7": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/orgs/HYGON-AI/repositories",
+        "note": "海光官方组织：vllm-plugin-das / sglang-das / inference-cookbook-das / apex-das / Megatron-LM-das 等 das 适配仓库（README 自述『为 hcu 平台提供功能适配』）",
+    },
+    "S8": {
+        "kind": "first-party",
+        "as_of": "2026-10-26/28",
+        "source": "一手实测记录（私有日志，未公开）：AMD Radeon PRO W7900 (gfx1100, RDNA3), ROCm 7.2.1, vLLM 0.16.1.dev+rocm721",
+        "note": "该环境下逐项核查两套服务栈启动配置：flashinfer 系 backend、NEXTN 投机、auto-round 量化、fp8 KV cache 均不可用；VLLM_ATTENTION_BACKEND=TRITON_ATTN 可恢复。仅代表该硬件/版本组合，不外推到其他 ROCm 目标",
+    },
+    "S9": {
+        "kind": "upstream-doc",
+        "source": "https://pytorch.org/get-started/locally/ + PEP 440 本地版本号",
+        "note": "PyTorch 官方按 +cuXXX / +rocmXXX 后缀区分 CUDA/ROCm wheel",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# 规则
+# kind=flag    : 服务栈启动参数（--xxx value / --xxx=value）
+# kind=env     : 环境变量赋值（KEY=VALUE）
+# kind=package : 依赖名（requirements / pyproject）
+# kind=torch-wheel : torch 本地版本后缀（+cu / +rocm），逻辑规则，状态在扫描时计算
+# platforms 缺某个平台 = 该平台状态 unknown（渲染时指向 S7 提示查厂商仓库）
+# ---------------------------------------------------------------------------
+
+FLAG_RULES = [
+    {
+        "id": "FLAG-ROCM-001",
+        "kind": "flag",
+        "flag": "--mamba-backend",
+        "values": ["flashinfer"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "ok"},
+        "evidence": "S8",
+        "note": "rocm: 一手实测该 backend 不可用；nvidia: FlashInfer 是 CUDA 库（S1），默认可用",
+    },
+    {
+        "id": "FLAG-ROCM-006",
+        "kind": "flag",
+        "flag": "--linear-attn-decode-backend",
+        "values": ["flashinfer"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "ok"},
+        "evidence": "S8",
+        "note": "同 FLAG-ROCM-001（decode 侧）",
+    },
+    {
+        "id": "FLAG-ROCM-002",
+        "kind": "flag",
+        "flag": "--linear-attn-prefill-backend",
+        "values": ["flashinfer"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "ok"},
+        "evidence": "S8",
+        "note": "同 FLAG-ROCM-001（prefill 侧）",
+    },
+    {
+        "id": "FLAG-ROCM-003",
+        "kind": "flag",
+        "flag": "--speculative-algorithm",
+        "values": ["nextn"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "unknown"},
+        "evidence": "S8",
+        "note": "NEXTN/MTP 投机解码在 sglang ROCm 后端不可用（一手实测）",
+    },
+    {
+        "id": "FLAG-ROCM-004",
+        "kind": "flag",
+        "flag": "--quantization",
+        "values": ["auto-round"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "unknown"},
+        "evidence": "S8",
+        "note": "auto-round W4A16 反量化走 CUDA 路径（一手实测）",
+    },
+    {
+        "id": "FLAG-ROCM-005",
+        "kind": "flag",
+        "flag": "--kv-cache-dtype",
+        "values": ["fp8", "fp8_e5m2", "fp8_e4m3"],
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked", "nvidia": "unknown"},
+        "evidence": "S8",
+        "note": "fp8 KV cache 在 RDNA3 上不完整（一手实测）",
+    },
+    {
+        "id": "FLAG-NVFP4-001",
+        "kind": "flag",
+        "flag": "--quantization",
+        "values": ["nvfp4", "modelopt_fp4", "modelopt_fp4_per_block", "fp4"],
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "partial", "rocm": "blocked"},
+        "evidence": "S8",
+        "note": "NVFP4 是 Blackwell 级特性：非 Blackwell 的 NVIDIA 卡与 ROCm 目标均过不去（一手核查）。dcu 不写键——缺省即 unknown（查 HYGON-AI das 仓库），不给一手 ROCm 证据越权背书",
+    },
+]
+
+ENV_RULES = [
+    {
+        "id": "ENV-ROCM-001",
+        "kind": "env",
+        "key": "VLLM_ATTENTION_BACKEND",
+        "value": "FLASH_ATTN",
+        "severity_hint": "blocker",
+        "platforms": {"rocm": "blocked"},
+        "evidence": "S8",
+        "note": "一手实测：该环境 flash-attn 2.8.3 缺 flash_attn_2_cuda 扩展，引擎初始化必崩，且表层报错是假线索（真异常在 EngineCore 子进程日志尾）",
+    },
+    {
+        "id": "ENV-ROCM-002",
+        "kind": "env",
+        "key": "VLLM_ATTENTION_BACKEND",
+        "value": "TRITON_ATTN",
+        "severity_hint": "info",
+        "platforms": {"rocm": "ok"},
+        "evidence": "S8",
+        "note": "一手实测：TRITON_ATTN 是该环境下可用的恢复路径",
+    },
+]
+
+PACKAGE_RULES = [
+    {
+        "id": "PKG-FLASHINFER-001",
+        "kind": "package",
+        "package": "flashinfer",
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "ok", "rocm": "blocked"},
+        "evidence": "S1",
+        "note": "上游只有 CUDA 分发；rocm: blocked（上游无 ROCm 轮子 + 一手实测相关 backend 不可用）",
+    },
+    {
+        "id": "PKG-FLASHATTN-001",
+        "kind": "package",
+        "package": "flash-attn",
+        "severity_hint": "warning",
+        "platforms": {"nvidia": "ok", "rocm": "variant"},
+        "evidence": "S2",
+        "note": "上游声明支持 ROCm 工具链（S2），另有 AMD 官方移植仓库 rocm/flash-attention（S3）；但 wheel 名称/安装路径与 CUDA 版不同，属 variant 不是直接可用",
+    },
+    {
+        "id": "PKG-VLLM-001",
+        "kind": "package",
+        "package": "vllm",
+        "severity_hint": "info",
+        "platforms": {"rocm": "ok", "dcu": "partial"},
+        "evidence": "S6",
+        "note": "rocm: 上游支持 AMD GPU（HIP 路径）；dcu: partial——需海光官方插件 vllm-plugin-das（S7），裸上游 wheel 不能假设可用",
+    },
+    {
+        "id": "PKG-SGLANG-001",
+        "kind": "package",
+        "package": "sglang",
+        "severity_hint": "info",
+        "platforms": {"rocm": "ok", "dcu": "partial"},
+        "evidence": "S4",
+        "note": "rocm: 上游平台表含 AMD Instinct；dcu: partial——需 sglang-das（S7）",
+    },
+    {
+        "id": "PKG-MEGATRON-001",
+        "kind": "package",
+        "package": "megatron",
+        "severity_hint": "warning",
+        "platforms": {"dcu": "partial"},
+        "evidence": "S7",
+        "note": "dcu: 海光维护 Megatron-LM-das 适配仓库（S7）；rocm/nvidia 状态未收录 → unknown",
+    },
+    {
+        "id": "PKG-APEX-001",
+        "kind": "package",
+        "package": "apex",
+        "severity_hint": "warning",
+        "platforms": {"dcu": "partial"},
+        "evidence": "S7",
+        "note": "dcu: 海光维护 apex-das（S7，自述含 HCU/HIP Kernel 融合优化）；其余平台未收录 → unknown",
+    },
+    {
+        "id": "PKG-TRITON-001",
+        "kind": "package",
+        "package": "triton",
+        "severity_hint": "info",
+        "platforms": {"nvidia": "ok", "rocm": "ok"},
+        "evidence": "S5",
+        "note": "Triton 有 NVPTX 与 AMDGPU 双后端",
+    },
+]
+
+# 所有规则的总列表（完整性测试用）
+ALL_RULES = FLAG_RULES + ENV_RULES + PACKAGE_RULES + [
+    {
+        "id": "PKG-TORCHWHEEL-001",
+        "kind": "torch-wheel",
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "ok", "rocm": "partial", "dcu": "partial"},
+        "evidence": "S9",
+        "note": "torch 本地版本后缀决定 wheel 属于哪个平台：+cuXXX 装到 ROCm/DCU 目标 = 装了也跑不了",
+    },
+]
+
+
+def flag_rules():
+    return [r for r in ALL_RULES if r["kind"] == "flag"]
+
+
+def env_rules():
+    return [r for r in ALL_RULES if r["kind"] == "env"]
+
+
+def package_rules():
+    return [r for r in ALL_RULES if r["kind"] == "package"]

@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+"""CLI 入口。
+
+用法：
+    accel-preflight scan --cmd "vllm serve ..." --platform rocm
+    accel-preflight scan --requirements requirements.txt --platform dcu
+    accel-preflight scan --pyproject pyproject.toml --platform dcu
+    accel-preflight --prove-red
+
+退出码：0 = 无 blocker；1 = 有 blocker（CI 应失败）；2 = 用法错误。
+"""
+
+import argparse
+import sys
+
+from accel_preflight import db, report, scan
+
+_USAGE = """usage:
+  accel-preflight scan --cmd "<命令行>" [--platform {nvidia,rocm,dcu}] [--json]
+  accel-preflight scan --requirements <file> [--platform ...] [--json]
+  accel-preflight scan --pyproject <file> [--platform ...] [--json]
+  accel-preflight --prove-red
+"""
+
+
+def _read_file(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _do_scan(args):
+    findings = []
+    if args.cmd is not None:
+        findings += scan.scan_command(args.cmd, args.platform)
+    if args.requirements is not None:
+        findings += scan.scan_requirements(_read_file(args.requirements), args.platform)
+    if args.pyproject is not None:
+        findings += scan.scan_pyproject(_read_file(args.pyproject), args.platform)
+
+    if args.json:
+        print(report.render_json(findings, args.platform))
+    else:
+        print(report.render_text(findings, args.platform))
+    return report.exit_code(findings)
+
+
+def _prove_red():
+    """自检：注入违规必须被抓（红），干净输入必须放行（绿）。任何一条不成立 → 退出 1。"""
+    bad = scan.scan_command(
+        "vllm serve m --kv-cache-dtype fp8_e4m3 --quantization auto-round", "rocm"
+    )
+    clean = scan.scan_command("vllm serve m --port 8000", "rocm")
+    bad_req = scan.scan_requirements(
+        "torch==2.9.1+cu128\nflashinfer\nsome-obscure-kernel-lib\n", "rocm"
+    )
+
+    checks = [
+        ("fp8 KV cache 被判 blocked", any(
+            f["id"] == "FLAG-ROCM-005" and f["status"] == "blocked" for f in bad)),
+        ("auto-round 被判 blocked", any(
+            f["id"] == "FLAG-ROCM-004" and f["status"] == "blocked" for f in bad)),
+        ("干净命令 0 blocker", not any(f["status"] == "blocked" for f in clean)),
+        ("CUDA wheel 装到 rocm 被判 blocked", any(
+            f["id"] == "PKG-TORCHWHEEL-001" and f["status"] == "blocked" for f in bad_req)),
+        ("flashinfer 被判 blocked", any(
+            f["id"] == "PKG-FLASHINFER-001" and f["status"] == "blocked" for f in bad_req)),
+        ("未知包写 unknown 而不是猜", any(
+            f["id"] == "PKG-UNKNOWN-001" and f["status"] == "unknown" for f in bad_req)),
+    ]
+    print("accel-preflight prove-red（自检：门必须能红，也要能绿）")
+    failed = 0
+    for name, ok in checks:
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name}")
+        if not ok:
+            failed += 1
+    if failed:
+        print(f"prove-red: {failed} 项自检失败", file=sys.stderr)
+        return 1
+    print("prove-red: all checks passed")
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="accel-preflight",
+        description="异构算力可移植性预检：在按下回车前，先告诉你哪些 CUDA-only 路径过不去。",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_USAGE,
+    )
+    parser.add_argument("--prove-red", action="store_true", help="运行自检（RED→GREEN 反证）")
+    sub = parser.add_subparsers(dest="sub")
+
+    p_scan = sub.add_parser("scan", help="扫描命令行 / 依赖文件")
+    p_scan.add_argument("--cmd", help="要扫描的启动命令")
+    p_scan.add_argument("--requirements", help="requirements.txt 路径")
+    p_scan.add_argument("--pyproject", help="pyproject.toml 路径")
+    p_scan.add_argument("--platform", choices=db.PLATFORMS, default="rocm")
+    p_scan.add_argument("--json", action="store_true", help="输出 JSON（供 CI 消费）")
+
+    args = parser.parse_args(argv)
+
+    if args.prove_red:
+        return _prove_red()
+
+    if args.sub != "scan":
+        parser.print_usage(sys.stderr)
+        return 2
+    if args.cmd is None and args.requirements is None and args.pyproject is None:
+        parser.print_usage(sys.stderr)
+        return 2
+
+    return _do_scan(args)

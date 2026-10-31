@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "accel-preflight"
+version = "0.1.0"
+description = "Accelerator portability preflight: catch CUDA-only flags, deps and wheels before they fail on ROCm / DCU"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "aidless" }]
+requires-python = ">=3.8"
+keywords = ["rocm", "hip", "dcu", "cuda", "vllm", "sglang", "portability", "llm-inference"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.scripts]
+accel-preflight = "accel_preflight.cli:main"
+
+[tool.setuptools]
+packages = ["accel_preflight"]
