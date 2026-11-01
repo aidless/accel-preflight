@@ -49,6 +49,7 @@ def _make_finding(rule, platform, match, status=None):
         "match": match,
         "message": rule["note"],
         "evidence": _evidence_for(rule, platform),
+        "fix": rule.get("fix", ""),
     }
 
 
@@ -165,6 +166,8 @@ def _scan_deps(raw_lines, platform):
                 "platforms": {},
                 "evidence": "S0",
                 "note": "数据库未收录该包的平台状态——答案必须是 unknown，需要人工查证",
+                "fix": "查该包上游 README 的安装矩阵与厂商适配仓库（DCU 见 S7，"
+                       "用 --explain S7 看清单），确认后再把结论补进规则库",
             }
             findings.append(_make_finding(unknown_rule, platform, line))
     return findings

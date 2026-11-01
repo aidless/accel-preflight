@@ -259,6 +259,43 @@ ALL_RULES = FLAG_RULES + ENV_RULES + PACKAGE_RULES + [
 ]
 
 
+# ---------------------------------------------------------------------------
+# 迁移建议（fix）：会判 blocker 的规则必须给出「改什么」——只说病不给药没帮上忙。
+# 措辞严格守着证据：能指到实测恢复路径的就指（S8），只能「关掉这个选项」的就
+# 直说关掉，绝不暗示某个未验证的替代方案一定可用。
+# ---------------------------------------------------------------------------
+FIXES = {
+    "FLAG-ROCM-001": "去掉该参数回到栈默认 backend，或设 VLLM_ATTENTION_BACKEND=TRITON_ATTN"
+                     "（后者是本项目一手实测确认可用的恢复路径，S8）",
+    "FLAG-ROCM-002": "同上：去掉 --linear-attn-prefill-backend，或改用 TRITON_ATTN（S8）",
+    "FLAG-ROCM-006": "同上：去掉 --linear-attn-decode-backend，或改用 TRITON_ATTN（S8）",
+    "FLAG-ROCM-003": "关闭投机解码（去掉 --speculative-algorithm）；如需投机，先确认目标平台"
+                     "确有对应实现再启用",
+    "FLAG-ROCM-004": "不启用该量化（去掉 --quantization auto-round）；确需低比特时走厂商量化"
+                     "工具链（DCU 见 S7）并自行验证精度",
+    "FLAG-ROCM-005": "去掉 fp8 KV cache 回到默认精度；显存吃紧时先复核容量预算再谈量化，"
+                     "别拿未验证的 fp8 换显存",
+    "FLAG-NVFP4-001": "NVFP4 仅 Blackwell 可用；非 Blackwell 平台请改用其他量化并自行验证，"
+                      "本项目不代为保证",
+    "ENV-ROCM-001": "改用 VLLM_ATTENTION_BACKEND=TRITON_ATTN（S8 实测恢复路径）",
+    "PKG-FLASHINFER-001": "从依赖里去掉 flashinfer，改用栈自带的 attention backend"
+                          "（S1：上游无 ROCm 分发）",
+    "PKG-FLASHATTN-001": "改用 AMD 官方移植仓 rocm/flash-attention 的安装方式（S3），或换回"
+                         "栈自带 attention backend（S2 只是声明工具链支持，wheel 形态不同）",
+    "PKG-VLLM-001": "DCU 上先装海光官方插件 vllm-plugin-das 并按其 cookbook 配置（S7）；"
+                    "不要假设裸上游 wheel 可用",
+    "PKG-SGLANG-001": "DCU 上使用 sglang-das 的适配分支/镜像（S7）",
+    "PKG-MEGATRON-001": "DCU 上参考 Megatron-LM-das（S7）；版本与上游不一致时以厂商仓为准",
+    "PKG-APEX-001": "DCU 上用 apex-das 替换上游 apex（S7）",
+    "PKG-TORCHWHEEL-001": "按目标平台渠道重装：CUDA 用 download.pytorch.org/whl/cuXXX，"
+                          "ROCm 用对应 rocm 渠道（S9）；两侧 wheel 不可混用",
+}
+
+for _rule in ALL_RULES:
+    if _rule["id"] in FIXES:
+        _rule["fix"] = FIXES[_rule["id"]]
+
+
 def flag_rules():
     return [r for r in ALL_RULES if r["kind"] == "flag"]
 
