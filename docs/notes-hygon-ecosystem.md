@@ -52,7 +52,36 @@
 EngineCore 子进程日志的尾部。这正是「预检应发生在装环境之前」的理由：
 等引擎崩了再查，浪费的是数小时的 GPU 机时。
 
-## 4. 这个仓库学到/固化的方法
+## 4. 2026-10-31 补课：DTK 到底是不是 ROCm
+
+之前只能从媒体报道推断「海光 DCU ≈ ROCm 系」，这不够——简历/方案里写推断会被追问。
+厂商自己的仓库给了原文（S13）：
+
+```bash
+# vllm-plugin-das README「Optional Build Configuration」
+export ROCM_PATH=/opt/dtk      # DTK 就装在 /opt/dtk，靠 ROCM_PATH 被构建链发现
+```
+
+同一份 README 的 CI lock 用 `match: release_line` 对 **DTK 26.04 / 26.10** 做版本匹配
+（`rocm.match` 字段），并且插件与上游 vLLM 之间有一道 PEP 440 版本门
+（epoch + release tuple 必须一致，pre/post/local 后缀可不同）。
+
+结论可以写成事实了：**DCU 的软件栈 DTK 是 ROCm 系，路径是 `/opt/dtk`，通过 `ROCM_PATH`
+暴露给 PyTorch/vLLM 的构建链**。这不是「兼容 CUDA」，是「HIP/ROCm 基础上再叠一层厂商适配」。
+
+另外两条边界，也都有上游原文：
+
+- **上游 sglang 仍把 Hygon HCU/DCU 列在「Integrations in progress」**（S11）。
+  也就是说 `pip install sglang` 在 DCU 上不是「支持」，是「厂商下游仓在跟」——
+  必须用 `sglang-das`。这条对写方案很关键：不能把上游 README 的平台表当成 DCU 支持清单。
+- **厂商 cookbook 是逐型号逐模型的 ✅ 矩阵**（S12）：K100_AI / BW1000 / BW1100 三列，
+  vLLM 与 SGLang 分行，同一模型在 K100_AI 上是 `-`（暂未验证）、在 BW1100 上是 ✅ 的情况很常见。
+  所以「DCU 支持 Qwen3.6」这种话必须带型号。
+
+这三条合起来就是本仓库对 DCU 的判定口径：**有厂商插件 → ok；只有上游包 → partial；
+两者都没有 → unknown**。
+
+## 5. 这个仓库学到/固化的方法
 
 - **证据台账模式**：每条规则强制挂一条证据，`kind ∈ {upstream-doc,
   first-party, meta}`，一手证据必须带 `as_of`；

@@ -99,21 +99,30 @@ python3 -m accel_preflight --prove-red
 
 1. **答案只有三态 + unknown**：`ok / variant / partial / blocked / unknown`。
    数据库没收录的包发 `PKG-UNKNOWN-001`，明说"不知道"，不猜。
-2. **每条规则挂一条证据**（S0–S9）：上游 README 引用、厂商仓库、或一手实测。
+2. **每条规则挂一条证据**（S0–S13）：上游 README 引用、厂商仓库、或一手实测。
 3. **一手证据不越权**：只在 AMD Radeon 消费卡（gfx1100, ROCm 7.2.1）上实测过，
    所以 `kind=first-party` 的证据永远不给 `dcu` 平台写任何状态——完整性测试
    （`tests/test_db_integrity.py::test_first_party_never_claims_dcu`）强制这条。
+   DCU 的答案只来自厂商侧公开文档（S11/S12/S13），口径是：**有厂商插件给 ok，
+   只有上游包给 partial，都没有仍是 unknown**。
 4. **unknown 也有出路**：规则在 DCU 平台缺省为 `unknown` 时，证据指针自动转向
    海光官方组织 [HYGON-AI](https://github.com/orgs/HYGON-AI/repositories)
    的 `*-das` 适配仓库——那里才是权威答案。
 
-## 覆盖范围（v0.2.0）
+## 覆盖范围（v0.3.0）
 
 | 类别 | 规则 |
 |------|------|
 | 启动参数 | flashinfer 系 backend（mamba / linear-attn decode/prefill）、NEXTN 投机、auto-round 量化、fp8 KV cache、NVFP4 |
+| 量化格式 | AWQ / GPTQ / Marlin / bitsandbytes / DeepSpeedFP（在 ROCm 上 blocked，S10）；GGUF（ok） |
 | 环境变量 | `VLLM_ATTENTION_BACKEND=FLASH_ATTN`（blocked）/ `=TRITON_ATTN`（ok） |
 | 依赖 | flashinfer、flash-attn、vllm、sglang、megatron、apex、triton、torch wheel 后缀 |
+| DCU 厂商件 | `vllm-plugin-das`、`sglang-das`（dcu=ok，其他平台 variant） |
+
+量化这一类的判定来自 vLLM 官方支持矩阵而不是猜：**AWQ / GPTQ / Marlin /
+llm-compressor INT8 / bitsandbytes / DeepSpeedFP 在 AMD GPU 列全是 ❌，FP8 W8A8 与
+GGUF 是 ✅**（S10）。也就是说在 ROCm 上换量化格式不是调参问题，是换内核问题。
+**这张表的列是 AMD GPU，不是 DCU**——所以我们不拿它给 dcu 下结论。
 
 **每条会判 blocker 的规则都带 `fix`（迁移建议）**，措辞守着证据：能指到实测恢复路径
 的就指（如 flashinfer → `TRITON_ATTN`，S8），只能"关掉这个选项"的就直说关掉，

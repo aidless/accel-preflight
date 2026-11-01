@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0 — 2026-10-31
+
+规则库按「先有上游原文，再写规则」扩了一轮，并把 DCU 从「一片 unknown」变成「有据可查」。
+
+### Added
+- **量化格式判定（S10）**：vLLM 官方 Supported Hardware 矩阵——AWQ / GPTQ / Marlin /
+  llm-compressor INT8 / bitsandbytes / DeepSpeedFP 在 AMD GPU 列全为 ❌ → `FLAG-QUANT-001`
+  在 rocm 判 blocked（这是换内核问题，不是调参问题）；FP8 W8A8 与 GGUF 为 ✅ →
+  `FLAG-QUANT-002`。
+- **DCU 厂商件规则**：`vllm-plugin-das`（S13）、`sglang-das`（S12）在 dcu 判 ok，
+  在其他平台判 variant。
+- **证据 S10–S13**（全部 `upstream-doc`，不是一手实测）：S10 量化矩阵；S11 上游 sglang
+  把 Hygon 列在「Integrations in progress」；S12 厂商 cookbook 的型号×模型 ✅ 矩阵；
+  S13 厂商插件 README——`export ROCM_PATH=/opt/dtk`、CI 按 DTK 26.04/26.10 release line
+  匹配。
+
+### Changed
+- `vllm` / `sglang` 的 dcu 说明从「需插件」细化为「逐型号逐模型，指到 S11/S12/S13」。
+- **包名匹配改成精确优先于前缀**：`vllm-plugin-das` 原本会被 `vllm` 的前缀匹配抢先命中，
+  判成上游 vllm 的 `partial`，把「厂商插件可用」这个更要紧的结论抹掉。
+- 版本一致性测试不再钉死 `"0.2.0"`，改为 semver 格式 + 与 pyproject 相等。
+
+### Tests
+- 54 → **69** 个测试，全绿；新增 `tests/test_quant_and_dcu.py`（15 条），先红后绿。
+- 新断言：DCU 上跑 `vllm / sglang / vllm-plugin-das` 不得出现任何 `unknown`，
+  且每条判定必须能追到厂商侧来源（S7/S12/S13）——「有据」不是「有个状态就算」。
+
 ## 0.2.0 — 2026-10-31
 
 从「指出病情」到「给出处方」。

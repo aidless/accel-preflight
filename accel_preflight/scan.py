@@ -136,6 +136,23 @@ def scan_command(cmd, platform):
 # 依赖扫描
 # ---------------------------------------------------------------------------
 
+def _match_package_rule(name):
+    """按包名匹配规则：精确命中优先于前缀命中。
+
+    顺序很重要：`vllm-plugin-das` 既精确命中自己的规则，也满足 `vllm` 的前缀匹配。
+    先按规则顺序取第一条会把它误判成上游 vllm（dcu=partial），抹掉「厂商插件可用」
+    这条更要紧的结论。
+    """
+    rules = db.package_rules()
+    for rule in rules:
+        if name == rule["package"]:
+            return rule
+    for rule in rules:
+        if name.startswith(rule["package"] + "-"):
+            return rule
+    return None
+
+
 def _scan_deps(raw_lines, platform):
     findings = []
     seen_torch = False
@@ -151,11 +168,10 @@ def _scan_deps(raw_lines, platform):
             continue
 
         matched = False
-        for rule in db.package_rules():
-            if name == rule["package"] or name.startswith(rule["package"] + "-"):
-                matched = True
-                findings.append(_make_finding(rule, platform, line))
-                break
+        rule = _match_package_rule(name)
+        if rule is not None:
+            matched = True
+            findings.append(_make_finding(rule, platform, line))
         if not matched:
             # 未收录的包：明确写 unknown，不猜。这条是逻辑规则、不在 db.ALL_RULES 里
             # （它不针对任何具体包，完整性测试的「至少一个平台表态」对它无意义）。

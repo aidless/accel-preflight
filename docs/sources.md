@@ -15,11 +15,24 @@
 | S7 | upstream-doc | github.com/orgs/HYGON-AI/repositories（vllm-plugin-das / sglang-das / inference-cookbook-das / apex-das / Megatron-LM-das 等） | 查证于 2026-10-31 | 海光官方组织，`das` 系列 = 为 HCU 平台提供功能适配。org 现列仓库中**没有** DeepSpeed-das |
 | S8 | first-party | 一手实测记录（私有日志）：AMD Radeon PRO W7900（gfx1100, RDNA3）、ROCm 7.2.1、vLLM 0.16.1.dev+rocm721 | 2026-10-26/28 | 逐项核查两套服务栈启动配置：flashinfer 系 backend、NEXTN 投机、auto-round 量化、fp8 KV cache 均不可用；`VLLM_ATTENTION_BACKEND=TRITON_ATTN` 可恢复。**仅代表该硬件/版本组合，不外推** |
 | S9 | upstream-doc | pytorch.org/get-started/locally（Compute Platform 含 CUDA 11.8/12.6/12.8 与 ROCm 6.3 两条分发渠道；`--index-url .../whl/cu118`） | 复验于 2026-10-31 | PyTorch 官方按 CUDA/ROCm 渠道分发 wheel；wheel 本地版本后缀（`+cuXXX`/`+rocmXXX`）随之，装错渠道的包无法运行 |
+| S10 | upstream-doc | github.com/vllm-project/vllm `docs/features/quantization/README.md`（Supported Hardware 表） | 查证于 2026-10-31 | 量化矩阵：AWQ / GPTQ / Marlin / llm-compressor INT8(W8A8,W4A8) / bitsandbytes / DeepSpeedFP 在 **AMD GPU 列全 ❌**；llm-compressor FP8 (W8A8) 与 GGUF **✅**。表自述 subject to change |
+| S11 | upstream-doc | github.com/sgl-project/sglang（README 平台表之后的「Integrations in progress」列表） | 查证于 2026-10-31 | 上游把 **Hygon HCU/DCU** 列在「集成进行中」，未进支持表 → 裸上游 sglang 不能假设在 DCU 可用 |
+| S12 | upstream-doc | github.com/HYGON-AI/inference-cookbook-das（模型列表：K100_AI / BW1000 / BW1100 × 框架，逐项 ✅ / 🚧 / -） | 查证于 2026-10-31 | 厂商按**型号×模型×框架**逐项给验证状态（vLLM / SGLang / vLLM-Omni…）：DCU 可用性有据，但口径是逐项的，不是全量 |
+| S13 | upstream-doc | github.com/HYGON-AI/vllm-plugin-das（README：`export ROCM_PATH=/opt/dtk`；CI lock 用 `match: release_line` 匹配 DTK 26.04/26.10） | 查证于 2026-10-31 | DTK 装在 `/opt/dtk` 且经 `ROCM_PATH` 被构建链发现 → **DCU 软件栈属 ROCm/DTK 系**（厂商原文，非本项目推断）；插件与上游 vLLM 之间有 PEP 440 版本门 |
 
 ## 为什么一手证据（S8）不给 DCU 写任何状态
 
 S8 只在一张 AMD Radeon 消费卡上产生。DCU/HCU 是不同的硬件、不同的驱动栈、
 不同厂商维护的推理插件。允许 S8 给 `dcu` 写 `blocked` 或 `ok` 都是越权，
 所以 `tests/test_db_integrity.py::test_first_party_never_claims_dcu`
-把「first-party 证据的规则不得含 dcu 键」写成硬断言；DCU 的答案只能来自
-S7（厂商仓库）或未来的 DCU 一手实测。
+把「first-party 证据的规则不得含 dcu 键」写成硬断言。
+
+DCU 的答案只能来自厂商侧公开文档。v0.3.0 起这类来源有三条（全部 `upstream-doc`，
+**不是**我们的一手实测，措辞上不得混为一谈）：
+
+- **S11** 上游 sglang 仍把 Hygon 列为「集成进行中」→ 上游 wheel 不能假设可用；
+- **S12** 厂商 cookbook 按型号×模型给出 ✅ 矩阵 → 可用性有据，但是逐项的；
+- **S13** 厂商 vLLM 插件把 DTK 放在 `/opt/dtk`、经 `ROCM_PATH` 取用 → 栈属 ROCm 系。
+
+因此 `dcu` 的判定口径统一为：**有厂商插件/适配仓时给 ok（装它），只有上游包时给
+partial（要适配），两条都没有时仍是 unknown**。查不到的东西继续写 unknown 并指路。

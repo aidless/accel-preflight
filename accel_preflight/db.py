@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """能力数据库：规则 + 证据台账。
 
-每条规则的判定都挂在一条证据上（S0–S9），台账见 docs/sources.md。
+每条规则的判定都挂在一条证据上（S0–S13），台账见 docs/sources.md。
 一手实测证据（kind=first-party）只允许给 ROCm 平台背书——我们没摸过
 DCU 硬件，所以凡是涉及 DCU 的状态一律来自上游公开文档，且查不到就写 unknown。
 """
@@ -72,6 +72,26 @@ EVIDENCE = {
         "kind": "upstream-doc",
         "source": "https://pytorch.org/get-started/locally/ + PEP 440 本地版本号",
         "note": "PyTorch 官方按 +cuXXX / +rocmXXX 后缀区分 CUDA/ROCm wheel",
+    },
+    "S10": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/vllm-project/vllm/blob/main/docs/features/quantization/README.md （Supported Hardware 表）",
+        "note": "vLLM 官方量化支持矩阵：AWQ / GPTQ / Marlin / llm-compressor INT8(W8A8,W4A8) / bitsandbytes / DeepSpeedFP 在 AMD GPU 列均为 ❌；llm-compressor FP8 (W8A8) 与 GGUF 为 ✅。文档自述该表 subject to change",
+    },
+    "S11": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/sgl-project/sglang （README：Supported Hardware 表之后的 Integrations in progress 列表）",
+        "note": "SGLang 上游把 Hygon HCU/DCU 列在「Integrations in progress」而非支持表——dcu 只能用下游适配仓，不能假设上游 wheel 直接可用",
+    },
+    "S12": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/HYGON-AI/inference-cookbook-das （模型列表：按 K100_AI / BW1000 / BW1100 × 框架逐项标 ✅ 已验证 / 🚧 开发中 / - 暂未验证）",
+        "note": "海光官方 cookbook 按型号×模型×框架逐项给出验证状态（vLLM / SGLang / vLLM-Omni 等）。含义：DCU 可用性有据可查，但是逐型号逐模型的口径，不是全量可用",
+    },
+    "S13": {
+        "kind": "upstream-doc",
+        "source": "https://github.com/HYGON-AI/vllm-plugin-das （README：export ROCM_PATH=/opt/dtk；CI lock 用 match: release_line 匹配 DTK 26.04/26.10；插件为 hcu 平台提供功能适配）",
+        "note": "海光官方 vLLM 插件：DTK 装在 /opt/dtk 且经 ROCM_PATH 被构建链发现，DTK 版本按 26.04/26.10 release line 匹配 → DCU 软件栈属 ROCm/DTK 系（厂商原文，非本项目推断）；插件与上游 vLLM 之间有 PEP 440 版本门",
     },
 }
 
@@ -155,6 +175,26 @@ FLAG_RULES = [
         "evidence": "S8",
         "note": "NVFP4 是 Blackwell 级特性：非 Blackwell 的 NVIDIA 卡与 ROCm 目标均过不去（一手核查）。dcu 不写键——缺省即 unknown（查 HYGON-AI das 仓库），不给一手 ROCm 证据越权背书",
     },
+    {
+        "id": "FLAG-QUANT-001",
+        "kind": "flag",
+        "flag": "--quantization",
+        "values": ["awq", "gptq", "gptq_marlin", "marlin", "bitsandbytes", "deepspeedfp"],
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "ok", "rocm": "blocked"},
+        "evidence": "S10",
+        "note": "rocm: vLLM 官方支持矩阵里这些量化格式的 AMD GPU 列全是 ❌（S10），不是配置问题而是没有对应内核；nvidia: 同一张表为 ✅。dcu 不写键——那张表的列是 AMD GPU，不是 DCU，不越权外推",
+    },
+    {
+        "id": "FLAG-QUANT-002",
+        "kind": "flag",
+        "flag": "--quantization",
+        "values": ["gguf"],
+        "severity_hint": "info",
+        "platforms": {"nvidia": "ok", "rocm": "ok"},
+        "evidence": "S10",
+        "note": "官方矩阵里 GGUF 在 AMD GPU 与各代 NVIDIA 均为 ✅（S10）",
+    },
 ]
 
 ENV_RULES = [
@@ -182,6 +222,24 @@ ENV_RULES = [
 
 PACKAGE_RULES = [
     {
+        "id": "PKG-VLLM-DAS-001",
+        "kind": "package",
+        "package": "vllm-plugin-das",
+        "severity_hint": "info",
+        "platforms": {"dcu": "ok", "rocm": "variant", "nvidia": "variant"},
+        "evidence": "S13",
+        "note": "dcu: 海光官方 vLLM 插件，是厂商给出的适配路径（S13），可用模型见 cookbook（S12）；rocm/nvidia: 面向 HCU/DTK，非目标平台 → variant",
+    },
+    {
+        "id": "PKG-SGLANG-DAS-001",
+        "kind": "package",
+        "package": "sglang-das",
+        "severity_hint": "info",
+        "platforms": {"dcu": "ok", "rocm": "variant", "nvidia": "variant"},
+        "evidence": "S12",
+        "note": "dcu: 海光 sglang 下游适配仓，cookbook 按型号×模型给出 ✅（S12），且上游仍把 Hygon 列为 in progress（S11）→ 必须走下游仓；rocm/nvidia: variant",
+    },
+    {
         "id": "PKG-FLASHINFER-001",
         "kind": "package",
         "package": "flashinfer",
@@ -206,7 +264,7 @@ PACKAGE_RULES = [
         "severity_hint": "info",
         "platforms": {"rocm": "ok", "dcu": "partial"},
         "evidence": "S6",
-        "note": "rocm: 上游支持 AMD GPU（HIP 路径）；dcu: partial——需海光官方插件 vllm-plugin-das（S7），裸上游 wheel 不能假设可用",
+        "note": "rocm: 上游支持 AMD GPU（HIP 路径）；dcu: partial——需海光官方插件 vllm-plugin-das（S7），可用性逐型号逐模型见 S12/S13，裸上游 wheel 不能假设可用",
     },
     {
         "id": "PKG-SGLANG-001",
@@ -215,7 +273,7 @@ PACKAGE_RULES = [
         "severity_hint": "info",
         "platforms": {"rocm": "ok", "dcu": "partial"},
         "evidence": "S4",
-        "note": "rocm: 上游平台表含 AMD Instinct；dcu: partial——需 sglang-das（S7）",
+        "note": "rocm: 上游平台表含 AMD Instinct；dcu: partial——上游把 Hygon 列在 Integrations in progress（S11），须用 sglang-das，验证状态见 S12",
     },
     {
         "id": "PKG-MEGATRON-001",
@@ -277,6 +335,8 @@ FIXES = {
                      "别拿未验证的 fp8 换显存",
     "FLAG-NVFP4-001": "NVFP4 仅 Blackwell 可用；非 Blackwell 平台请改用其他量化并自行验证，"
                       "本项目不代为保证",
+    "FLAG-QUANT-001": "换成官方矩阵里 AMD GPU 支持的格式（llm-compressor FP8 W8A8 或 GGUF，S10），"
+                      "或先在目标型号上自验；本项目只做预检，不代为保证精度损失",
     "ENV-ROCM-001": "改用 VLLM_ATTENTION_BACKEND=TRITON_ATTN（S8 实测恢复路径）",
     "PKG-FLASHINFER-001": "从依赖里去掉 flashinfer，改用栈自带的 attention backend"
                           "（S1：上游无 ROCm 分发）",

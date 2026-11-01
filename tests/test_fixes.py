@@ -181,8 +181,9 @@ class TestVersionConsistency(unittest.TestCase):
         self.assertIsNotNone(m, "pyproject.toml 里找不到 version")
         self.assertEqual(accel_preflight.__version__, m.group(1))
 
-    def test_version_is_0_2_0(self):
-        self.assertEqual(accel_preflight.__version__, "0.2.0")
+    def test_version_is_semver(self):
+        # 不钉死具体版本号（每次发版都要改断言 = 脆），只钉格式 + 与 pyproject 一致。
+        self.assertRegex(accel_preflight.__version__, r"^\d+\.\d+\.\d+$")
 
 
 if __name__ == "__main__":
