@@ -133,6 +133,66 @@ GGUF 是 ✅**（S10）。也就是说在 ROCm 上换量化格式不是调参问
 不回答"这条路一定能跑通"。删掉一个 blocker 之前，仍然要在目标机器上做一次
 真实的冒烟验证。
 
+## 证明什么 / 不证明什么
+
+**证明**（每条都能沿证据指针复算，见下方「复算」）：
+
+1. 一份具体的启动命令 / `requirements.txt` / `pyproject.toml`，在
+   `nvidia` / `rocm` / `dcu` 三个平台上，每个命中的参数、量化格式、
+   环境变量、依赖的判定**只取四态之一**（`ok`/`variant`/`partial`/`blocked`），
+   没有第五种"没写就是能用"的默认值——缺省一律 `unknown`（S0），不猜。
+2. 每条判 `blocked` 的规则都带 `fix` 迁移建议，且 `fix` 措辞**不得出现**
+   无证据的强断言（"保证/一定能/必然"），测试 `tests/test_fixes.py` 强制这条。
+3. 一手实测证据（S8，`kind=first-party`）**绝不外推**：它只在 AMD Radeon
+   消费卡（gfx1100，ROCm 7.2.1）上产生，因此永远不给 `dcu` 平台写任何状态
+   （`tests/test_db_integrity.py::test_first_party_never_claims_dcu` 是硬断言）。
+4. DCU 的判定口径是**厂商侧文档优先**：有厂商插件/适配仓给 `ok`，只有上游包
+   给 `partial`，两条都没有仍是 `unknown`（S11/S12/S13）。
+
+**不证明**：
+
+1. **不证明任何目标机器上"一定能跑通"**。这是静态规则匹配，不是运行时验证；
+   它只回答"大概率过不去/没证据"。`blocked` 被清掉之后，仍须在目标机器做一次
+   真实冒烟。
+2. **不证明 DCU 上的可用性**。DCU/HCU 是不同硬件、不同驱动栈、不同厂商插件；
+   本项目一手证据从未在 DCU 上产生过，DCU 的状态全部来自厂商侧公开文档，
+   且口径是**逐型号×逐模型**的（S12），不是全量。
+3. **不证明规则的完备性**。只覆盖台账收录的启动参数、量化格式、环境变量与
+   依赖；未收录的包/参数一律报 `PKG-UNKNOWN-001`/`FLAG-UNKNOWN` 并指向出处，
+   这不是"知道能用"，是"查不到，请自行核实"。
+4. **不证明 vLLM/SGLang 官方支持矩阵的稳定性**。S10 等上游来源自述
+   "subject to change"，规则状态可能随上游文档漂移，需按证据 `as_of` 日期重新查证。
+
+## 复算
+
+所有判定数字与规则均可在本仓库内重算，零外部服务：
+
+```bash
+# 1) 全量测试（含 RED→GREEN 自检、first-party 不外推、fix 无强断言）
+python3 -m pytest -q
+
+# 2) 门必须能红也要能绿（注入违规→断言真拦；注入干净→断言不误杀）
+python3 -m accel_preflight --prove-red
+
+# 3) 追一条证据的出处（来源、记录日期、被哪些规则引用）
+python3 -m accel_preflight --explain S8
+
+# 4) 复现 README 顶部示例的输出（含退出码 1 断言）
+python3 -m accel_preflight scan \
+  --cmd "vllm serve Qwen/Qwen3-8B --kv-cache-dtype fp8_e4m3" \
+  --platform rocm ; echo "exit=$?"
+```
+
+规则清单可直接从 `accel_preflight/db.py` 读出：
+
+```bash
+python3 -c "from accel_preflight import db; print(len(db.flag_rules()), 'flag_rules /', len(db.env_rules()), 'env_rules /', len(db.package_rules()), 'package_rules'); print(sorted(db.EVIDENCE))"
+# → 9 flag_rules / 2 env_rules / 9 package_rules；证据 S0–S13
+```
+
+任何 README 中出现的数字（规则数、证据数、退出码约定、覆盖范围类别）
+都以该命令输出为准，禁止凭记忆写。
+
 ## 相关项目
 
 - [roofline-lint](https://github.com/aidless/roofline-lint) —— 算力够不够
