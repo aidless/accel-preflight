@@ -193,6 +193,26 @@ python3 -c "from accel_preflight import db; print(len(db.flag_rules()), 'flag_ru
 任何 README 中出现的数字（规则数、证据数、退出码约定、覆盖范围类别）
 都以该命令输出为准，禁止凭记忆写。
 
+## 基准（bench/results.json，2026-11-01 实测）
+
+扫描延迟基准证明「毫秒级预检」的定位成立。数字来自 `bench/scan_latency.py`，
+`time.perf_counter` 每项重复 20 次取中位，本机实测：
+
+```bash
+python3 bench/scan_latency.py
+```
+
+| 项目 | 实测中位 | 说明 |
+|---|---|---|
+| 冷启动 import | 2.289 ms | 每次 CLI 进程都付的固定成本 |
+| 命令扫描（rocm，含 4 个 CUDA-only 参数） | 0.090 ms | 4 findings |
+| 200 行 requirements 扫描（dcu） | 0.715 ms | 220 findings |
+| 规则库 | 9 flag / 2 env / 9 pkg | 证据 S0–S13 |
+
+结论：单条启动命令的预检在**亚毫秒**、完整迁移清单在**毫秒级**，纯标准库、
+零网络——满足「在按下回车之前先告诉你哪些 CUDA-only 路径过不去」的使用场景。
+这是静态规则匹配的延迟，**不包含**目标机上真实冒烟的时间（见「不证明」第 1 条）。
+
 ## 相关项目
 
 - [roofline-lint](https://github.com/aidless/roofline-lint) —— 算力够不够

@@ -1,0 +1,27 @@
+{
+  "tool": "accel-preflight",
+  "version": "0.3.0",
+  "method": "time.perf_counter, median of 20 reps",
+  "cold_import_s": 0.002289,
+  "scan_command": {
+    "cmd_sample": "vllm serve Qwen/Qwen3-8B --tensor-parallel-size 4 --kv-cache-dtype fp8_e4m3 --mamba-backend flashinfer --speculative-algorithm NEXTN --quantization auto-round --max-model-len 32768 --gpu-memory-utilization 0.85",
+    "platform": "rocm",
+    "findings": 4,
+    "median_s": 9e-05,
+    "min_s": 8.6e-05,
+    "max_s": 0.000176
+  },
+  "scan_requirements_200": {
+    "platform": "dcu",
+    "lines": 240,
+    "findings": 220,
+    "median_s": 0.000715,
+    "min_s": 0.000686,
+    "max_s": 0.001067
+  },
+  "rule_counts": {
+    "flag_rules": 9,
+    "env_rules": 2,
+    "package_rules": 9
+  }
+}
