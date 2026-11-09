@@ -72,10 +72,18 @@ def _prove_red():
     bad_req = scan.scan_requirements(
         "torch==2.9.1+cu128\nflashinfer\nsome-obscure-kernel-lib\n", "rocm"
     )
+    cuda_index = scan.scan_requirements(
+        "--extra-index-url https://download.pytorch.org/whl/cu118\ntorch==2.9.1\n",
+        "rocm",
+    )
+    dcu_fp8 = scan.scan_command("vllm serve m --kv-cache-dtype fp8_e4m3", "dcu")
+    dcu_plugin = scan.scan_requirements("vllm-plugin-das==0.28.1\n", "dcu")
 
     checks = [
         ("fp8 KV cache 被判 blocked", any(
             f["id"] == "FLAG-ROCM-005" and f["status"] == "blocked" for f in bad)),
+        ("fp8 KV cache 的 basis 是 observed", any(
+            f["id"] == "FLAG-ROCM-005" and f["basis"] == "observed" for f in bad)),
         ("auto-round 被判 blocked", any(
             f["id"] == "FLAG-ROCM-004" and f["status"] == "blocked" for f in bad)),
         ("干净命令 0 blocker", not any(f["status"] == "blocked" for f in clean)),
@@ -85,6 +93,14 @@ def _prove_red():
             f["id"] == "PKG-FLASHINFER-001" and f["status"] == "blocked" for f in bad_req)),
         ("未知包写 unknown 而不是猜", any(
             f["id"] == "PKG-UNKNOWN-001" and f["status"] == "unknown" for f in bad_req)),
+        ("whl/cu118 索引在 rocm 上被判 blocked", any(
+            f["id"] == "PKG-INDEXURL-001" and f["status"] == "blocked" for f in cuda_index)),
+        ("DCU 不继承 W7900 的 fp8 结论", all(
+            f["basis"] != "observed" for f in dcu_fp8) and any(
+            f["status"] == "unknown" for f in dcu_fp8)),
+        ("DCU 插件 ok 的 basis 不是 observed", any(
+            f["id"] == "PKG-VLLM-DAS-001" and f["status"] == "ok"
+            and f["basis"] == "upstream-doc" for f in dcu_plugin)),
         ("每条 blocker 都带迁移建议", all(
             f.get("fix", "").strip() for f in bad if f["status"] == "blocked")),
         ("markdown 报告含表格结构", "|" in report.render_markdown(bad, "rocm")),

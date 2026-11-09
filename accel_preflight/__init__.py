@@ -6,7 +6,8 @@
 
 设计原则（与 roofline-lint 同源）：
 - 答不上来就说 unknown，绝不猜。
-- 每条判定必须带证据指针（上游文档引用或一手实测记录）。
+- 每条判定带证据指针，并用 basis 区分 observed / upstream-doc / unknown。
+- observed 只来自已记录的一手会话；DCU 没有这种会话。
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

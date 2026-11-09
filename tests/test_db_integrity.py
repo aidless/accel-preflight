@@ -42,10 +42,28 @@ class TestDbIntegrity(unittest.TestCase):
                 self.assertIn("as_of", ev, f"一手证据 {sid} 缺 as_of")
 
     def test_first_party_never_claims_dcu(self):
-        # 一手实测只跑过 ROCm 消费卡，绝不允许给 DCU 平台背书
+        # 一手证据不能给 DCU 背书。非 unknown 的状态若引用一手证据，平台只能是 rocm。
+        # nvidia=unknown 仍可指向 S8，表示「只测过 ROCm，所以 NVIDIA 不给结论」。
         for r in db.ALL_RULES:
-            if db.EVIDENCE[r["evidence"]]["kind"] == "first-party":
-                self.assertNotIn("dcu", r["platforms"], f"规则 {r['id']} 用一手 ROCm 证据给 DCU 背书")
+            platforms = set(r["platforms"]) | set(r.get("platform_evidence") or {})
+            for plat in platforms:
+                ev_id = db.evidence_id_for(r, plat)
+                self.assertIn(ev_id, db.EVIDENCE, f"{r['id']} 的 {plat} 指向不存在的 {ev_id}")
+                if db.EVIDENCE[ev_id]["kind"] != "first-party":
+                    continue
+                self.assertNotEqual(plat, "dcu", f"规则 {r['id']} 用一手证据 {ev_id} 给 DCU 背书")
+                status = r["platforms"].get(plat, "unknown")
+                if status != "unknown":
+                    self.assertEqual(
+                        plat, "rocm",
+                        f"规则 {r['id']} 用一手证据 {ev_id} 给 {plat}={status} 背书",
+                    )
+
+    def test_platform_evidence_keys_are_real(self):
+        for r in db.ALL_RULES:
+            for plat, ev_id in (r.get("platform_evidence") or {}).items():
+                self.assertIn(plat, db.PLATFORMS, r["id"])
+                self.assertIn(ev_id, db.EVIDENCE, f"{r['id']} {plat} → {ev_id}")
 
 
 if __name__ == "__main__":

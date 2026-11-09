@@ -29,8 +29,8 @@ EVIDENCE = {
     },
     "S1": {
         "kind": "upstream-doc",
-        "source": "https://github.com/flashinfer-ai/flashinfer （README：仅 CUDA Support，12.9/13.0/13.4）",
-        "note": "FlashInfer 上游只发 CUDA 轮子，无 ROCm 分发",
+        "source": "https://github.com/flashinfer-ai/flashinfer README，2026-11-09 重读 raw main：CUDA Support 列出 12.9 / 13.0 / 13.4；GPU Support 表只有 NVIDIA SM75–SM121；安装名是 flashinfer-python，另有 flashinfer-cubin 与被写成 CUDA-specific shim 的 flashinfer-jit-cache。该次阅读没有看到 ROCm/HIP 行。",
+        "note": "上游发行面是 CUDA/NVIDIA。本仓库没有在 ROCm 或 DCU 上重跑 FlashInfer。",
     },
     "S2": {
         "kind": "upstream-doc",
@@ -65,13 +65,14 @@ EVIDENCE = {
     "S8": {
         "kind": "first-party",
         "as_of": "2026-10-26/28",
-        "source": "一手实测记录（私有日志，未公开）：AMD Radeon PRO W7900 (gfx1100, RDNA3), ROCm 7.2.1, vLLM 0.16.1.dev+rocm721",
-        "note": "该环境下逐项核查两套服务栈启动配置：flashinfer 系 backend、NEXTN 投机、auto-round 量化、fp8 KV cache 均不可用；VLLM_ATTENTION_BACKEND=TRITON_ATTN 可恢复。仅代表该硬件/版本组合，不外推到其他 ROCm 目标",
+        "source": "一手实测记录（私有日志，未公开，不在本仓库）：AMD Radeon PRO W7900 (gfx1100, RDNA3), ROCm 7.2.1, vLLM 0.16.1.dev+rocm721",
+        "scope": "仅此一台 gfx1100 / RDNA3 / ROCm 7.2.1 / vLLM 0.16.1.dev+rocm721。不是 MI300/MI350，不是其他 ROCm 版本，不是 DCU。原始日志不在仓库里，不能从本树复算。",
+        "note": "该私有会话里：flashinfer 系 backend、NEXTN、auto-round、fp8 KV cache 不可用；VLLM_ATTENTION_BACKEND=TRITON_ATTN 可恢复。docs/notes-hygon-ecosystem.md 同一节还列出 NVFP4，但本条原始记录最初没写 NVFP4，日志又未入库，所以 NVFP4 行比重更低。不外推到其他 ROCm GPU，更不外推到 DCU。",
     },
     "S9": {
         "kind": "upstream-doc",
-        "source": "https://pytorch.org/get-started/locally/ + PEP 440 本地版本号",
-        "note": "PyTorch 官方按 +cuXXX / +rocmXXX 后缀区分 CUDA/ROCm wheel",
+        "source": "https://pytorch.org/get-started/locally/ ，页面自述 Last updated 2026-10-28，本仓库于 2026-11-09 重读。Compute Platform 可见 CUDA 11.8 / 12.6 / 12.8、CPU，以及带删除线的 ROCm 6.3。页面给出的安装示例是 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118。",
+        "note": "CUDA 与 CPU 是页面上分开的渠道；示例用 whl/cu118 索引，不是「装上 torch 就等于 CUDA 或 ROCm」。+cu / +rocm 本地版本标签是 2026-10-31 台账里已有的 PEP 440 约定，这次重读没有在页面正文里再看到这些后缀。ROCm 6.3 在页面上是删除线，不能把 +rocm 标签写成「当前仍在发行」。没有 DCU 渠道。",
     },
     "S10": {
         "kind": "upstream-doc",
@@ -111,9 +112,10 @@ FLAG_RULES = [
         "flag": "--mamba-backend",
         "values": ["flashinfer"],
         "severity_hint": "blocker",
-        "platforms": {"rocm": "blocked", "nvidia": "ok"},
-        "evidence": "S8",
-        "note": "rocm: 一手实测该 backend 不可用；nvidia: FlashInfer 是 CUDA 库（S1），默认可用",
+        "platforms": {"rocm": "blocked", "nvidia": "ok", "dcu": "blocked"},
+        "evidence": "S1",
+        "platform_evidence": {"rocm": "S8", "nvidia": "S1", "dcu": "S1"},
+        "note": "rocm: S8 仅一台 W7900 上该 backend 不可用（observed，不外推到其他 ROCm GPU）。nvidia: S1，上游把 FlashInfer 写成 CUDA 库，不是我们跑过 NVIDIA。dcu: S1，拒绝 CUDA-only 构件；没有 DCU 实测，不能写成在 DCU 上跑挂了。",
     },
     {
         "id": "FLAG-ROCM-006",
@@ -121,9 +123,10 @@ FLAG_RULES = [
         "flag": "--linear-attn-decode-backend",
         "values": ["flashinfer"],
         "severity_hint": "blocker",
-        "platforms": {"rocm": "blocked", "nvidia": "ok"},
-        "evidence": "S8",
-        "note": "同 FLAG-ROCM-001（decode 侧）",
+        "platforms": {"rocm": "blocked", "nvidia": "ok", "dcu": "blocked"},
+        "evidence": "S1",
+        "platform_evidence": {"rocm": "S8", "nvidia": "S1", "dcu": "S1"},
+        "note": "同 FLAG-ROCM-001（decode 侧）。dcu 的 blocked 引用 S1，不引用 S8。",
     },
     {
         "id": "FLAG-ROCM-002",
@@ -131,9 +134,10 @@ FLAG_RULES = [
         "flag": "--linear-attn-prefill-backend",
         "values": ["flashinfer"],
         "severity_hint": "blocker",
-        "platforms": {"rocm": "blocked", "nvidia": "ok"},
-        "evidence": "S8",
-        "note": "同 FLAG-ROCM-001（prefill 侧）",
+        "platforms": {"rocm": "blocked", "nvidia": "ok", "dcu": "blocked"},
+        "evidence": "S1",
+        "platform_evidence": {"rocm": "S8", "nvidia": "S1", "dcu": "S1"},
+        "note": "同 FLAG-ROCM-001（prefill 侧）。dcu 的 blocked 引用 S1，不引用 S8。",
     },
     {
         "id": "FLAG-ROCM-003",
@@ -171,9 +175,9 @@ FLAG_RULES = [
         "flag": "--quantization",
         "values": ["nvfp4", "modelopt_fp4", "modelopt_fp4_per_block", "fp4"],
         "severity_hint": "blocker",
-        "platforms": {"nvidia": "partial", "rocm": "blocked"},
+        "platforms": {"rocm": "blocked"},
         "evidence": "S8",
-        "note": "NVFP4 是 Blackwell 级特性：非 Blackwell 的 NVIDIA 卡与 ROCm 目标均过不去（一手核查）。dcu 不写键——缺省即 unknown（查 HYGON-AI das 仓库），不给一手 ROCm 证据越权背书",
+        "note": "rocm: docs/notes 把 NVFP4 列进同一段 W7900 私有会话；S8 原始 note 起初没写它，日志不在仓库内，权重大于猜测、小于可复算实测。nvidia 不写键：没有非 Blackwell NVIDIA 的单独记录，缺省 unknown。dcu 不写键。",
     },
     {
         "id": "FLAG-QUANT-001",
@@ -243,10 +247,11 @@ PACKAGE_RULES = [
         "id": "PKG-FLASHINFER-001",
         "kind": "package",
         "package": "flashinfer",
+        "also": ["flashinfer-python", "flashinfer-cubin", "flashinfer-jit-cache"],
         "severity_hint": "blocker",
-        "platforms": {"nvidia": "ok", "rocm": "blocked"},
+        "platforms": {"nvidia": "ok", "rocm": "blocked", "dcu": "blocked"},
         "evidence": "S1",
-        "note": "上游只有 CUDA 分发；rocm: blocked（上游无 ROCm 轮子 + 一手实测相关 backend 不可用）",
+        "note": "2026-11-09 README 的安装名是 flashinfer-python，GPU 表只有 NVIDIA。rocm/dcu: blocked 是拒绝这份 CUDA-only 发行物（S1），不是 DCU 或 Instinct 上的运行记录。nvidia: ok 只表示上游把自己写成 CUDA 库。",
     },
     {
         "id": "PKG-FLASHATTN-001",
@@ -312,7 +317,26 @@ ALL_RULES = FLAG_RULES + ENV_RULES + PACKAGE_RULES + [
         "severity_hint": "blocker",
         "platforms": {"nvidia": "ok", "rocm": "partial", "dcu": "partial"},
         "evidence": "S9",
-        "note": "torch 本地版本后缀决定 wheel 属于哪个平台：+cuXXX 装到 ROCm/DCU 目标 = 装了也跑不了",
+        "note": "torch 的本地版本标签按渠道对照。运行时矩阵在 scan.TORCH_TAG_STATUS，以测试为准；+cpu 不是 CUDA 标签。dcu 上 +rocm 保持 unknown。",
+        "status_is_computed": True,
+    },
+    {
+        "id": "PKG-WHEELTAG-001",
+        "kind": "torch-wheel",
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "blocked", "rocm": "blocked", "dcu": "blocked"},
+        "evidence": "S9",
+        "note": "非 torch 依赖上的 +cu / whl/cu / +rocm 标签。状态在扫描时按 scan.OTHER_TAG_STATUS 覆盖，静态 platforms 不是矩阵。dcu 上拒绝 CUDA 标签是渠道不匹配，不是 DCU 实测。",
+        "status_is_computed": True,
+    },
+    {
+        "id": "PKG-INDEXURL-001",
+        "kind": "package",
+        "severity_hint": "blocker",
+        "platforms": {"nvidia": "ok", "rocm": "blocked", "dcu": "blocked"},
+        "evidence": "S9",
+        "note": "requirements 里的 --index-url / --extra-index-url / --find-links 指向 download.pytorch.org/whl/cuNNN。rocm/dcu 拒绝该 CUDA 渠道；nvidia 的 ok 只表示渠道名字对得上，不是装过。状态可被扫描覆盖。",
+        "status_is_computed": True,
     },
 ]
 
@@ -333,8 +357,8 @@ FIXES = {
                      "工具链（DCU 见 S7）并自行验证精度",
     "FLAG-ROCM-005": "去掉 fp8 KV cache 回到默认精度；显存吃紧时先复核容量预算再谈量化，"
                      "别拿未验证的 fp8 换显存",
-    "FLAG-NVFP4-001": "NVFP4 仅 Blackwell 可用；非 Blackwell 平台请改用其他量化并自行验证，"
-                      "本项目不代为保证",
+    "FLAG-NVFP4-001": "去掉该量化后再在目标机器上自验。本仓库没有非 Blackwell NVIDIA 的记录，"
+                      "也没有 DCU 记录，不代为保证其他量化可用",
     "FLAG-QUANT-001": "换成官方矩阵里 AMD GPU 支持的格式（llm-compressor FP8 W8A8 或 GGUF，S10），"
                       "或先在目标型号上自验；本项目只做预检，不代为保证精度损失",
     "ENV-ROCM-001": "改用 VLLM_ATTENTION_BACKEND=TRITON_ATTN（S8 实测恢复路径）",
@@ -347,13 +371,37 @@ FIXES = {
     "PKG-SGLANG-001": "DCU 上使用 sglang-das 的适配分支/镜像（S7）",
     "PKG-MEGATRON-001": "DCU 上参考 Megatron-LM-das（S7）；版本与上游不一致时以厂商仓为准",
     "PKG-APEX-001": "DCU 上用 apex-das 替换上游 apex（S7）",
-    "PKG-TORCHWHEEL-001": "按目标平台渠道重装：CUDA 用 download.pytorch.org/whl/cuXXX，"
-                          "ROCm 用对应 rocm 渠道（S9）；两侧 wheel 不可混用",
+    "PKG-TORCHWHEEL-001": "按目标平台渠道重装：CUDA 用 download.pytorch.org/whl/cuXXX（S9 示例是 cu118）。"
+                          "+rocm 只说明标签写了 rocm，不说明该版本仍在发行；不要把 CUDA 渠道装到 ROCm/DCU 目标上。",
+    "PKG-WHEELTAG-001": "这条依赖的本地版本或 URL 带 CUDA 渠道标签（S9）。换目标平台的 wheel，或删掉这条；本工具没有在目标卡上装过它。",
+    "PKG-INDEXURL-001": "删掉 whl/cuNNN 索引，改成目标平台的渠道（S9）。这条只认 URL 字符串，不代表已经在目标机上安装失败过。",
 }
 
 for _rule in ALL_RULES:
     if _rule["id"] in FIXES:
         _rule["fix"] = FIXES[_rule["id"]]
+
+
+def evidence_id_for(rule, platform):
+    """该平台实际引用的证据。缺省平台不沿用一手 ROCm 证据给 DCU 背书。"""
+    per = rule.get("platform_evidence") or {}
+    if platform in per:
+        return per[platform]
+    if platform in rule.get("platforms", {}):
+        return rule["evidence"]
+    if platform == "dcu":
+        return "S7"
+    return rule["evidence"]
+
+
+def basis_for(evidence_id, status):
+    """observed = 一手且状态不是 unknown；upstream-doc = 文档推断；unknown = 没有结论。"""
+    if status == "unknown":
+        return "unknown"
+    kind = EVIDENCE[evidence_id]["kind"]
+    if kind == "first-party":
+        return "observed"
+    return "upstream-doc"
 
 
 def flag_rules():
