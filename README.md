@@ -1,5 +1,7 @@
 # accel-preflight
 
+[![CI](https://github.com/aidless/accel-preflight/actions/workflows/ci.yml/badge.svg)](https://github.com/aidless/accel-preflight/actions/workflows/ci.yml)
+
 **在按下回车之前，先告诉你哪些 CUDA-only 路径在 ROCm / 国产 DCU 上过不去。**
 
 异构算力可移植性预检 CLI。输入一段 `vllm serve` / `sglang.launch_server`
