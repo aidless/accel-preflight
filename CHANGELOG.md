@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 — 2026-11-09
+
+诚实边界，不是新的硬件结果。状态仍是 WIP：没有 DCU 捕获，S8 的原始日志不在仓库里。
+
+### Changed
+- 报告增加 `basis`：`observed` / `upstream-doc` / `unknown`。只有 S8 且状态不是 unknown 才是 `observed`，并带上 gfx1100 的 `scope`。
+- FlashInfer 系 flag 在 DCU 上改为 `blocked`，证据是 S1（CUDA-only 发行物），不引用 S8。W7900 上的 fp8 / NEXTN / auto-round 在 DCU 上仍是 `unknown`。
+- NVFP4 不再给 NVIDIA 写 `partial`。没有单独的非 Blackwell 机器记录。
+- 包名按 PEP 503 折叠。`flashinfer-python` / `flashinfer-cubin` / `flashinfer-jit-cache` 列入 S1（2026-11-09 重读 README）。
+- `whl/cuNNN` 索引、非 torch 的 `+cu` 标签、`torch @ …/whl/cu…` URL 在 rocm/dcu 上拒绝。`+cpu` 不再被 `startswith("cu")` 误判成 CUDA 并在 nvidia 上给 `ok`。
+- `ok` 规则的前缀命中降为 `partial`。optional-dependencies 与 dependency-groups 会扫。`-r` 不打开，并显式标 unknown。
+- S9 记了 2026-11-09 对 pytorch.org 安装页的重读：示例是 `whl/cu118`，ROCm 6.3 带删除线。`+cu`/`+rocm` 本地版本仍是 2026-10-31 的台账约定，这次页面正文没有再印出。
+
+### Docs
+- README 的问题陈述压到三行，并分开 OBSERVED 与 UNKNOWN。
+- 新增 `STATUS.md`（WIP）和 `FAILURE_MODES.md`（假绿与 DCU 假结论）。
+- 测试数、CI 的 Python 版本、禁止 PyPI 徽章和作者绝对路径，由 `tests/test_honesty.py` 对着仓库现况核对。
+
 ## 0.3.0 — 2026-10-31
 
 规则库按「先有上游原文，再写规则」扩了一轮，并把 DCU 从「一片 unknown」变成「有据可查」。

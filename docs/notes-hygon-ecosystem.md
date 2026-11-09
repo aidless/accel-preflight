@@ -36,6 +36,9 @@
 
 ## 3. CUDA-only 路径清单（一手实测，2026-10-26/28）
 
+这一节的原始日志**没有放进仓库**。下面是当时的笔记，不是一份可以复算的捕获。
+范围只有这一台 W7900。不要把它读成 Instinct 或 DCU 的结果。
+
 在一台 Radeon PRO W7900（gfx1100/RDNA3, ROCm 7.2.1, vLLM 0.16.1.dev+rocm721）
 上逐项核查两套服务栈的启动配置，5 类路径过不去：
 
@@ -43,7 +46,7 @@
 2. `--speculative-algorithm NEXTN`（MTP 投机）；
 3. `--quantization auto-round`（W4A16 反量化走 CUDA 路径）；
 4. `--kv-cache-dtype fp8_e4m3`（RDNA3 fp8 不完整）；
-5. NVFP4 / modelopt_fp4：Blackwell 专属，连非 Blackwell 的 NVIDIA 卡都过不去。
+5. NVFP4 / modelopt_fp4：笔记里把它和上面四条写在一起。`db.py` 的 S8 原始说明起初没有这一条，原始日志又不在仓库里，所以规则只在 `rocm` 上保留 blocked，并且**不**给 NVIDIA 写状态。这里早先写的「连非 Blackwell 的 NVIDIA 卡都过不去」没有单独的机器记录，不能当成 observed。
 
 恢复路径：`VLLM_ATTENTION_BACKEND=TRITON_ATTN`。
 

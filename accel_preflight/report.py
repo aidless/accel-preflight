@@ -28,9 +28,12 @@ def render_text(findings, platform):
         for f in blockers:
             lines.append(
                 f"  [{f['id']}] {f['match']}  →  {f['status']}"
+                f"  basis={f.get('basis', 'unspecified')}"
                 f"  (证据 {f['evidence']})"
             )
             lines.append(f"      {f['message']}")
+            if f.get("scope"):
+                lines.append(f"      scope: {f['scope']}")
             fix_line = _fix_line(f, "      ")
             if fix_line:
                 lines.append(fix_line)
@@ -41,9 +44,12 @@ def render_text(findings, platform):
         for f in others:
             lines.append(
                 f"  [{f['id']}] {f['match']}  →  {f['status'].upper()}"
+                f"  basis={f.get('basis', 'unspecified')}"
                 f"  (证据 {f['evidence']})"
             )
             lines.append(f"      {f['message']}")
+            if f.get("scope"):
+                lines.append(f"      scope: {f['scope']}")
             fix_line = _fix_line(f, "      ")
             if fix_line:
                 lines.append(fix_line)
@@ -89,13 +95,14 @@ def render_markdown(findings, platform):
         lines.append(f"未发现需要处理的问题（0 blocker）。")
         return "\n".join(lines)
 
-    lines.append("| 规则 | 状态 | 命中 | 证据 | 说明 | 迁移建议 |")
-    lines.append("|---|---|---|---|---|---|")
+    lines.append("| 规则 | 状态 | basis | 命中 | 证据 | 说明 | 迁移建议 |")
+    lines.append("|---|---|---|---|---|---|---|")
     for f in ordered:
         lines.append(
-            "| `{id}` | {status} | `{match}` | {ev} | {msg} | {fix} |".format(
+            "| `{id}` | {status} | {basis} | `{match}` | {ev} | {msg} | {fix} |".format(
                 id=_md_cell(f["id"]),
                 status=_md_cell(f["status"]),
+                basis=_md_cell(f.get("basis") or "—"),
                 match=_md_cell(f["match"]),
                 ev=_md_cell(f["evidence"]),
                 msg=_md_cell(f["message"]),
@@ -117,9 +124,17 @@ def render_explain(evidence_id):
     ]
     if ev.get("as_of"):
         lines.append(f"  记录日期：{ev['as_of']}")
+    if ev.get("scope"):
+        lines.append(f"  范围：{ev['scope']}")
     lines.append(f"  说明：{ev['note']}")
 
-    used_by = [r["id"] for r in db.ALL_RULES if r["evidence"] == evidence_id]
+    used_by = []
+    for rule in db.ALL_RULES:
+        cited = rule["evidence"] == evidence_id or evidence_id in (
+            rule.get("platform_evidence") or {}
+        ).values()
+        if cited:
+            used_by.append(rule["id"])
     lines.append("  引用规则：" + (", ".join(used_by) if used_by else "（无，兜底/指路用）"))
     return "\n".join(lines)
 

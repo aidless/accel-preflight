@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "accel-preflight"
-version = "0.3.0"
+version = "0.4.0"
 description = "Accelerator portability preflight: catch CUDA-only flags, deps and wheels before they fail on ROCm / DCU"
 readme = "README.md"
 license = { text = "MIT" }
