@@ -31,10 +31,12 @@ DCU 相关的状态一律标 `unknown` 并指向厂商适配仓库，绝不外�
 
 ## 快速开始
 
-零依赖，Python ≥ 3.8：
+零依赖，Python ≥ 3.8。现已上架 PyPI：
 
 ```bash
-python3 -m accel_preflight scan \
+# 安装后直接用 CLI 入口（或继续用 python3 -m accel_preflight）
+pip install accel-preflight
+accel-preflight scan \
   --cmd "vllm serve Qwen/Qwen3-8B --kv-cache-dtype fp8_e4m3" \
   --platform rocm
 ```
