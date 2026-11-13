@@ -1,6 +1,11 @@
 # accel-preflight
 
+[![CI](https://github.com/aidless/accel-preflight/actions/workflows/ci.yml/badge.svg)](https://github.com/aidless/accel-preflight/actions/workflows/ci.yml)
+
 **在按下回车之前，先告诉你哪些 CUDA-only 路径在 ROCm / 国产 DCU 上过不去。**
+
+
+![demo](docs/demo.gif)
 
 异构算力可移植性预检 CLI。输入一段 `vllm serve` / `sglang.launch_server`
 启动命令或一份 `requirements.txt`，它按「证据台账」逐项检查：
@@ -26,10 +31,12 @@ DCU 相关的状态一律标 `unknown` 并指向厂商适配仓库，绝不外�
 
 ## 快速开始
 
-零依赖，Python ≥ 3.8：
+零依赖，Python ≥ 3.8。现已上架 PyPI：
 
 ```bash
-python3 -m accel_preflight scan \
+# 安装后直接用 CLI 入口（或继续用 python3 -m accel_preflight）
+pip install accel-preflight
+accel-preflight scan \
   --cmd "vllm serve Qwen/Qwen3-8B --kv-cache-dtype fp8_e4m3" \
   --platform rocm
 ```
@@ -46,6 +53,20 @@ BLOCKER (1):
 
 summary: 1 blocker, 0 notice
 ```
+
+
+自检与证据解释（均为真实输出）：
+
+```bash
+python3 -m accel_preflight --prove-red
+# prove-red: all checks passed        ← 7 条反向断言，每条规则都能红
+
+python3 -m accel_preflight explain FLAG-ROCM-005
+# 证据 S8（first-party）：AMD Radeon PRO W7900（gfx1100, RDNA3）,
+# ROCm 7.2.1 + vLLM 0.16.1.dev+rocm721，实测记录 2026-10-26/28
+```
+
+
 
 也可以扫依赖文件与 pyproject：
 
@@ -212,6 +233,25 @@ python3 bench/scan_latency.py
 结论：单条启动命令的预检在**亚毫秒**、完整迁移清单在**毫秒级**，纯标准库、
 零网络——满足「在按下回车之前先告诉你哪些 CUDA-only 路径过不去」的使用场景。
 这是静态规则匹配的延迟，**不包含**目标机上真实冒烟的时间（见「不证明」第 1 条）。
+
+## Limits
+
+- **静态检查不等于跑通**：本工具回答"这条路大概率过不去/没证据"，不回答
+  "这条路一定能跑通"；删掉 blocker 后仍需在目标机器做真实冒烟验证。
+- 一手实测证据（S8 等）只覆盖 AMD Radeon 消费卡（gfx1100 / ROCm 7.2.1），
+  不给 DCU 平台背书；DCU 结论只来自厂商公开文档，未收录即 `unknown`。
+- 规则库是小集合（v0.3.0 覆盖表见上），未收录的包/参数发 `PKG-UNKNOWN-001`，
+  明说不知道，不猜。
+
+## 结构导览
+
+| 路径 | 内容 |
+|------|------|
+| `accel_preflight/` | CLI 包：`db.py`（证据台账 S0–S13）、scan/explain 入口 |
+| `db.py` | 每条规则挂一条证据；`kind=first-party` 永不写 dcu 状态 |
+| `tests/test_db_integrity.py` | 台账完整性 + 反向断言（`--prove-red` 的 7 条） |
+| `docs/sources.md` | 证据来源全表（S0–S13） |
+| `docs/demo.gif` | 上面嵌入的 scan/explain 实录 |
 
 ## 相关项目
 
