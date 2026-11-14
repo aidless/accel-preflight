@@ -77,7 +77,7 @@ def render_markdown(findings, platform):
     blockers = [f for f in ordered if f["status"] == "blocked"]
 
     lines = [
-        f"# accel-preflight 迁移预检报告",
+        "# accel-preflight 迁移预检报告",
         "",
         f"- 目标平台：`{platform}`",
         f"- blocker：**{len(blockers)}**",
@@ -86,7 +86,7 @@ def render_markdown(findings, platform):
     ]
 
     if not ordered:
-        lines.append(f"未发现需要处理的问题（0 blocker）。")
+        lines.append("未发现需要处理的问题（0 blocker）。")
         return "\n".join(lines)
 
     lines.append("| 规则 | 状态 | 命中 | 证据 | 说明 | 迁移建议 |")
