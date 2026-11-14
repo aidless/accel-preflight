@@ -266,3 +266,30 @@ accel-preflight 管"这份配置搬过去能跑吗"。**
 ## License
 
 MIT © 2026 aidless
+
+## 验收题库与复算
+
+`eval/cases.jsonl` 是 20 条可执行验收题，覆盖规则库台账、启动参数判定、环境变量判定、
+依赖判定、torch wheel 后缀、报告渲染与退出码、bench 数据、文档台账八个口径。
+大部分题目的期望值不是抄文档，而是**调用本仓库 API 现算**：
+
+```bash
+python3 eval/run_cases.py            # 20/20 cases passed
+python3 eval/run_cases.py --save     # 顺带把结果写进 eval/run-report.json
+python3 eval/run_cases.py --selftest # 篡改一条期望值，必须变红（19/20）
+```
+
+| mode | 含义 | 条数 |
+|---|---|---|
+| `expr` | 跑一段 Python（真调 `accel_preflight.db` / `scan` / `report`，或真解析 `bench/results.json`），比对 `result` 与 `expected` | 17 |
+| `raises` | `verify` 必须抛指定异常（如 `render_explain('S99')` → `KeyError`） | 1 |
+| `doc` | 断言某文件的某条正则（证据台账 S8 行、本节标题） | 2 |
+
+**数字如何复算**：`eval/run-report.json` 里每条 case 都带 `id` / `axis` / `detail`，
+把 `detail` 与 `cases.jsonl` 的 `verify` 代码一起看，就能从源码复现该数字
+（例如 `DB-03` 的 21 条规则 = 9 flag + 2 env + 9 package + 1 torch-wheel）；
+`--save` 重跑一次即可重建整份报告，不需要手工抄数。
+
+**失败归因**：`run_cases.py` 不只报通过率，失败时按 `axis` 汇总（例如
+`scan/torchwheel: 1 条 —— TW-02`），直接指出是哪个模块的哪个口径坏了，
+而不是丢一个 pass_rate 让人自己猜。

@@ -1,0 +1,129 @@
+{
+ "total": 20,
+ "passed": 20,
+ "failed": 0,
+ "selftest": false,
+ "failed_by_axis": {},
+ "results": [
+  {
+   "id": "DB-01",
+   "axis": "db/evidence",
+   "ok": true,
+   "detail": "14"
+  },
+  {
+   "id": "DB-02",
+   "axis": "db/evidence",
+   "ok": true,
+   "detail": "S8"
+  },
+  {
+   "id": "DB-03",
+   "axis": "db/rules",
+   "ok": true,
+   "detail": "21"
+  },
+  {
+   "id": "DB-04",
+   "axis": "db/rules",
+   "ok": true,
+   "detail": "9"
+  },
+  {
+   "id": "DB-05",
+   "axis": "db/rules",
+   "ok": true,
+   "detail": "0"
+  },
+  {
+   "id": "FL-01",
+   "axis": "scan/flags",
+   "ok": true,
+   "detail": "blocked"
+  },
+  {
+   "id": "FL-02",
+   "axis": "scan/flags",
+   "ok": true,
+   "detail": "unknown"
+  },
+  {
+   "id": "EN-01",
+   "axis": "scan/env",
+   "ok": true,
+   "detail": "ok"
+  },
+  {
+   "id": "EN-02",
+   "axis": "scan/env",
+   "ok": true,
+   "detail": "blocked"
+  },
+  {
+   "id": "DP-01",
+   "axis": "scan/deps",
+   "ok": true,
+   "detail": "ok"
+  },
+  {
+   "id": "DP-02",
+   "axis": "scan/deps",
+   "ok": true,
+   "detail": "PKG-UNKNOWN-001"
+  },
+  {
+   "id": "TW-01",
+   "axis": "scan/torchwheel",
+   "ok": true,
+   "detail": "blocked"
+  },
+  {
+   "id": "TW-02",
+   "axis": "scan/torchwheel",
+   "ok": true,
+   "detail": "unknown"
+  },
+  {
+   "id": "RP-01",
+   "axis": "report/text",
+   "ok": true,
+   "detail": "summary: 0 blocker, 0 notice"
+  },
+  {
+   "id": "RP-02",
+   "axis": "report/exit",
+   "ok": true,
+   "detail": "1"
+  },
+  {
+   "id": "RP-03",
+   "axis": "report/markdown",
+   "ok": true,
+   "detail": "a\\|b c"
+  },
+  {
+   "id": "EX-01",
+   "axis": "cli/explain",
+   "ok": true,
+   "detail": "raised KeyError"
+  },
+  {
+   "id": "BE-01",
+   "axis": "bench/data",
+   "ok": true,
+   "detail": "9"
+  },
+  {
+   "id": "DOC-01",
+   "axis": "docs/ledger",
+   "ok": true,
+   "detail": "| S8 | first-party |"
+  },
+  {
+   "id": "DOC-02",
+   "axis": "docs/readme",
+   "ok": true,
+   "detail": "## 验收题库与复算"
+  }
+ ]
+}
